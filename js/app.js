@@ -147,8 +147,16 @@ function getWorkingDays(yearAD, month) {
   return working;
 }
 
+// Random time in 7:00–8:30 (minutes 420–510), return "HH:MM"
+function randomTimeIn() {
+  const min = 420 + Math.floor(Math.random() * 91); // 7:00–8:30
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+}
+
 // Fill print form (#printform) with report data
-function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays) {
+function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays, useRandomTime) {
   const yearBE = yearAD + 543;
   const daysInMonth = new Date(yearAD, month, 0).getDate();
   const leaveMap = {};
@@ -180,6 +188,21 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
     const dateStr = day + "/" + month + "/" + yearBE;
     const code = leaveMap[day];
     let remark = "";
+    let timeIn = "";
+    let timeOut = "";
+    if (useRandomTime) {
+      if (code === "PL0.5M" || code === "SL0.5M") {
+        timeIn = "12:00";
+        timeOut = "18:00";
+      } else if (code === "PL0.5A" || code === "SL0.5A") {
+        timeIn = randomTimeIn();
+        timeOut = "12:00";
+      } else if (!code || code === "มา") {
+        timeIn = randomTimeIn();
+        timeOut = "18:00";
+      }
+      // PL1, SL1, ขาด: leave timeIn/timeOut blank
+    }
     if (code) {
       remark = LEAVE_CODE_TO_LABEL[code] || code;
       if (code === "ขาด") countAbsent += 1;
@@ -190,7 +213,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
     }
     rows.push(
       "<tr><td class=\"border border-black py-1 px-1\">" + dateStr +
-      "</td><td class=\"border border-black py-1 px-1\"></td><td class=\"border border-black py-1 px-1\"></td>" +
+      "</td><td class=\"border border-black py-1 px-1\">" + timeIn + "</td><td class=\"border border-black py-1 px-1\">" + timeOut + "</td>" +
       "<td class=\"border border-black py-1 px-1\">" + remark + "</td></tr>"
     );
   }
@@ -325,7 +348,8 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       leaveByDay.push({ day, raw, code });
     }
 
-    fillPrintForm(month, year, searchFullName, studentId, leaveByDay, workingDays);
+    const useRandomTime = document.getElementById("randomTimeCheck") && document.getElementById("randomTimeCheck").checked;
+    fillPrintForm(month, year, searchFullName, studentId, leaveByDay, workingDays, useRandomTime);
     const printform = document.getElementById("printform");
     const reportResult = document.getElementById("reportResult");
     if (reportResult) {
