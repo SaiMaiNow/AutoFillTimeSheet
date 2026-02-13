@@ -100,13 +100,14 @@ function parseCSVLine(line) {
   return result;
 }
 
-// Detect month and year from first row e.g. "January 2026" or "January (2026)" or ",,,January (2026),,,"
 function detectMonthYearFromText(lineText) {
+  lineText = String(lineText || "").trim();
   const match = lineText.match(
-    /(January|February|March|April|May|June|July|August|September|October|November|December)\s*(?:\((\d{4})\)|(\d{4}))/i
+    /(January|February|Febuary|March|April|May|June|July|August|September|October|November|December)\s*(?:\(\s*(\d{4})\s*\)|(\d{4}))/i
   );
   if (!match) return null;
-  const monthName = match[1];
+  let monthName = match[1];
+  if (monthName.toLowerCase() === "febuary") monthName = "February";
   const year = parseInt(match[2] || match[3], 10);
   const month = MONTH_NAMES_EN.findIndex((m) => m.toLowerCase() === monthName.toLowerCase()) + 1;
   return month >= 1 ? { month, year } : null;
@@ -155,13 +156,13 @@ function randomTimeIn() {
   return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
 }
 
-// Fill print form (#printform) with report data
+// Fill print form (#printform) with report data (inputs normalized for PDF)
 function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays, useRandomTime) {
+  fullName = String(fullName || "").trim();
+  studentId = String(studentId || "").trim();
   const yearBE = yearAD + 543;
-  const daysInMonth = new Date(yearAD, month, 0).getDate();
   const leaveMap = {};
   leaveByDay.forEach(({ day, code }) => { leaveMap[day] = code; });
-  const workingSet = new Set(workingDays);
 
   const printMonthEl = document.getElementById("printMonth");
   const printNameEl = document.getElementById("printName");
@@ -197,7 +198,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       } else if (code === "PL0.5A" || code === "SL0.5A") {
         timeIn = randomTimeIn();
         timeOut = "12:00";
-      } else if (!code || code === "มา") {
+      } else {
         timeIn = randomTimeIn();
         timeOut = "18:00";
       }
@@ -261,13 +262,15 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       return;
     }
 
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    // Normalize whole file before parse (trim and consistent line endings)
+    text = text.trim();
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
     if (lines.length === 0) {
       showResult("ไฟล์ CSV ว่าง", true);
       return;
     }
 
-    // Detect month/year from first row (e.g. "สถิติการลา intern(January 2026)")
+    // Detect month/year from first row (e.g. "สถิติการลา intern(January 2026)" or ",,,Febuary(2026 ),,,,")
     const firstRowText = lines[0];
     const monthYear = detectMonthYearFromText(firstRowText);
     if (!monthYear) {
@@ -279,9 +282,8 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
     }
 
     const { month, year } = monthYear;
-    const monthLabel = MONTH_NAMES_EN[month - 1] + " " + year;
 
-    // Parse CSV rows; skip title row, next row is header
+    // Parse CSV rows; skip title row, next row is header (each line already trimmed)
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
       rows.push(parseCSVLine(lines[i]));
@@ -327,7 +329,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
 
     const workingDays = getWorkingDays(year, month);
     const dataRow = rows[matchedRowIndex - 1];
-    const studentId = (document.getElementById("numberId") && document.getElementById("numberId").value) || "";
+    const studentId = ((document.getElementById("numberId") && document.getElementById("numberId").value) || "").trim();
 
     // Day columns: header cells "1".."31"
     const dayCols = [];
