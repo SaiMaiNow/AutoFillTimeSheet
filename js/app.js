@@ -357,7 +357,10 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       reportResult.innerHTML = "";
     }
     if (printform) {
+      const prevTitle = document.title;
+      document.title = searchFullName;
       window.print();
+      setTimeout(function () { document.title = prevTitle; }, 1000);
     }
   });
 })();
