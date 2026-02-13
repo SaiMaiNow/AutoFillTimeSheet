@@ -4,8 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auto fill Time sheet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    
+<body class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-md p-6 w-full max-w-md">
+        <h1 class="text-xl font-semibold text-gray-800 mb-6">Auto fill Time sheet</h1>
+        <form class="space-y-4">
+            <div>
+                <label for="firstName" class="block text-sm font-medium text-gray-700 mb-1">ชื่อจริง</label>
+                <input type="text" id="firstName" name="firstName" placeholder="ชื่อจริง"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            </div>
+            <div>
+                <label for="lastName" class="block text-sm font-medium text-gray-700 mb-1">นามสกุล</label>
+                <input type="text" id="lastName" name="lastName" placeholder="นามสกุล"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            </div>
+            <div>
+                <label for="numberId" class="block text-sm font-medium text-gray-700 mb-1">เลขนักศึกษา</label>
+                <input type="text" id="numberId" name="numberId" placeholder="เลขนักศึกษา"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            </div>
+            <div>
+                <label for="csvFile" class="block text-sm font-medium text-gray-700 mb-1">อัปโหลดไฟล์ CSV (UTF-8 เท่านั้น)</label>
+                <input type="file" id="csvFile" name="csvFile" accept=".csv,text/csv,application/csv"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <p id="csvError" class="mt-1 text-sm text-red-600 hidden"></p>
+            </div>
+            <button type="button" id="generateReport" class="w-full py-2.5 px-4 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 outline-none transition">
+                Generate report
+            </button>
+        </form>
+        <div id="reportResult" class="mt-4 p-4 bg-gray-50 rounded-md text-sm text-gray-700 hidden"></div>
+    </div>
+    <script src="./js/app.js"></script>
 </body>
 </html>
