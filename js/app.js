@@ -96,6 +96,26 @@ function detectMonthYearFromText(lineText) {
   return month >= 1 ? { month, year } : null;
 }
 
+// Leave code rules: Thai description -> code (ตัวหนังสือเริ่มต้น + ระยะเวลา). "ขาด" = Absent.
+const LEAVE_CODE_RULES = [
+  { pattern: /ลาป่วย\s*ทั้งวัน|SL\s*1|SL1/i, code: "SL1" },
+  { pattern: /ลาป่วย\s*ครึ่งวันเช้า|SL\s*0\.5\s*M|SL0\.5M/i, code: "SL0.5M" },
+  { pattern: /ลาป่วย\s*ครึ่งวันบ่าย|SL\s*0\.5\s*A|SL0\.5A/i, code: "SL0.5A" },
+  { pattern: /ลากิจ\s*ทั้งวัน|PL\s*1|PL1/i, code: "PL1" },
+  { pattern: /ลากิจ\s*ครึ่งวันเช้า|PL\s*0\.5\s*M|PL0\.5M/i, code: "PL0.5M" },
+  { pattern: /ลากิจ\s*ครึ่งวันบ่าย|PL\s*0\.5\s*A|PL0\.5A/i, code: "PL0.5A" },
+  { pattern: /ขาด/i, code: "ขาด" },
+];
+
+function normalizeLeaveCode(cellValue) {
+  const s = String(cellValue || "").trim();
+  if (!s) return "";
+  for (const { pattern, code } of LEAVE_CODE_RULES) {
+    if (pattern.test(s)) return code;
+  }
+  return s;
+}
+
 // Get working days in month (exclude Sat, Sun and Thai public holidays)
 function getWorkingDays(yearAD, month) {
   const daysInMonth = new Date(yearAD, month, 0).getDate();
@@ -211,11 +231,40 @@ function getWorkingDays(yearAD, month) {
     }
 
     const workingDays = getWorkingDays(year, month);
+    const dataRow = rows[matchedRowIndex - 1];
+
+    // Day columns: header cells "1".."31"
+    const dayCols = [];
+    for (let i = 0; i < header.length; i++) {
+      const h = String(header[i]).trim();
+      if (/^\d{1,2}$/.test(h)) {
+        const d = parseInt(h, 10);
+        if (d >= 1 && d <= 31) dayCols.push({ day: d, colIndex: i });
+      }
+    }
+
+    // Apply leave code rules to the matched row (แถวชื่อที่เจอ)
+    const leaveByDay = [];
+    for (const { day, colIndex } of dayCols) {
+      const raw = (dataRow[colIndex] || "").trim();
+      if (!raw) continue;
+      const code = normalizeLeaveCode(raw);
+      leaveByDay.push({ day, raw, code });
+    }
 
     let html = `<p class="font-medium">เดือน/ปี ที่พบในไฟล์: ${monthLabel}</p>`;
     html += `<p>แถวที่ตรงกับชื่อของคุณ: แถวที่ ${matchedRowIndex} (แถวที่ 1 = หัวตาราง)</p>`;
     html += `<p class="mt-2">วันทำงาน (ไม่รวมเสาร์-อาทิตย์ และวันหยุดราชการ): ${workingDays.join(", ")}</p>`;
     html += `<p class="mt-1 text-gray-600">รวม ${workingDays.length} วัน</p>`;
+    if (leaveByDay.length > 0) {
+      html += `<p class="mt-3 font-medium">การลาตามกฎ (รหัส):</p>`;
+      html += `<ul class="mt-1 list-disc list-inside text-gray-700">`;
+      for (const { day, raw, code } of leaveByDay) {
+        const label = raw !== code ? `วันที่ ${day}: "${raw}" → ${code}` : `วันที่ ${day}: ${code}`;
+        html += `<li>${label}</li>`;
+      }
+      html += `</ul>`;
+    }
     showResult(html, false);
   });
 })();
