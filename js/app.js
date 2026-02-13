@@ -325,25 +325,15 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       leaveByDay.push({ day, raw, code });
     }
 
-    let html = `<p class="font-medium">เดือน/ปี ที่พบในไฟล์: ${monthLabel}</p>`;
-    html += `<p>แถวที่ตรงกับชื่อของคุณ: แถวที่ ${matchedRowIndex} (แถวที่ 1 = หัวตาราง)</p>`;
-    html += `<p class="mt-2">วันทำงาน (ไม่รวมเสาร์-อาทิตย์ และวันหยุดราชการ): ${workingDays.join(", ")}</p>`;
-    html += `<p class="mt-1 text-gray-600">รวม ${workingDays.length} วัน</p>`;
-    if (leaveByDay.length > 0) {
-      html += `<p class="mt-3 font-medium">การลาตามกฎ (รหัส):</p>`;
-      html += `<ul class="mt-1 list-disc list-inside text-gray-700">`;
-      for (const { day, raw, code } of leaveByDay) {
-        const label = raw !== code ? `วันที่ ${day}: "${raw}" → ${code}` : `วันที่ ${day}: ${code}`;
-        html += `<li>${label}</li>`;
-      }
-      html += `</ul>`;
-    }
-    html += `<p class="mt-3 text-blue-600 font-medium">ข้อมูลถูกเติมในใบลงเวลาแล้ว เลื่อนลงด้านล่างหรือกดปุ่มพิมพ์เพื่อพิมพ์</p>`;
-
     fillPrintForm(month, year, searchFullName, studentId, leaveByDay, workingDays);
     const printform = document.getElementById("printform");
-    if (printform) printform.classList.remove("hidden");
-
-    showResult(html, false);
+    const reportResult = document.getElementById("reportResult");
+    if (reportResult) {
+      reportResult.classList.add("hidden");
+      reportResult.innerHTML = "";
+    }
+    if (printform) {
+      window.print();
+    }
   });
 })();
