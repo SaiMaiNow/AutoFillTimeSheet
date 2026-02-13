@@ -60,6 +60,22 @@ const MONTH_NAMES_EN = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+const MONTH_NAMES_TH = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+// Map leave code to หมายเหตุ label for print form
+const LEAVE_CODE_TO_LABEL = {
+  "PL1": "ลากิจทั้งวัน",
+  "PL0.5M": "ลากิจครึ่งวันเช้า",
+  "PL0.5A": "ลากิจครึ่งวันบ่าย",
+  "SL1": "ลาป่วยทั้งวัน",
+  "SL0.5M": "ลาป่วยครึ่งวันเช้า",
+  "SL0.5A": "ลาป่วยครึ่งวันบ่าย",
+  "ขาด": "ขาด",
+};
+
 // Parse a single CSV line (handles quoted fields)
 function parseCSVLine(line) {
   const result = [];
@@ -129,6 +145,62 @@ function getWorkingDays(yearAD, month) {
     working.push(day);
   }
   return working;
+}
+
+// Fill print form (#printform) with report data
+function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays) {
+  const yearBE = yearAD + 543;
+  const daysInMonth = new Date(yearAD, month, 0).getDate();
+  const leaveMap = {};
+  leaveByDay.forEach(({ day, code }) => { leaveMap[day] = code; });
+  const workingSet = new Set(workingDays);
+
+  const printMonthEl = document.getElementById("printMonth");
+  const printNameEl = document.getElementById("printName");
+  const printIdEl = document.getElementById("printId");
+  const tbody = document.getElementById("timesheetBody");
+  const sumPresentEl = document.getElementById("sumPresent");
+  const sumPersonalEl = document.getElementById("sumPersonal");
+  const sumSickEl = document.getElementById("sumSick");
+  const sumAbsentEl = document.getElementById("sumAbsent");
+
+  if (printMonthEl) printMonthEl.textContent = MONTH_NAMES_TH[month - 1] + " " + yearBE;
+  if (printNameEl) printNameEl.textContent = fullName;
+  if (printIdEl) printIdEl.textContent = studentId;
+
+  let countPresent = 0;
+  let countPersonal = 0;
+  let countSick = 0;
+  let countAbsent = 0;
+
+  // Only working days (no Sat/Sun, no public holidays) - ใส่แค่วันที่มาได้
+  const rows = [];
+  const sortedWorking = [...workingDays].sort((a, b) => a - b);
+  for (const day of sortedWorking) {
+    const dateStr = day + "/" + month + "/" + yearBE;
+    const code = leaveMap[day];
+    let remark = "";
+    if (code) {
+      remark = LEAVE_CODE_TO_LABEL[code] || code;
+      if (code === "ขาด") countAbsent += 1;
+      else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
+      else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+    } else {
+      countPresent += 1;
+    }
+    rows.push(
+      "<tr><td class=\"border border-black py-1 px-1\">" + dateStr +
+      "</td><td class=\"border border-black py-1 px-1\"></td><td class=\"border border-black py-1 px-1\"></td>" +
+      "<td class=\"border border-black py-1 px-1\">" + remark + "</td></tr>"
+    );
+  }
+  if (tbody) tbody.innerHTML = rows.join("");
+
+  const fmt = (n) => (n % 1 === 0 ? String(n) : n.toFixed(1));
+  if (sumPresentEl) sumPresentEl.textContent = fmt(countPresent);
+  if (sumPersonalEl) sumPersonalEl.textContent = fmt(countPersonal);
+  if (sumSickEl) sumSickEl.textContent = fmt(countSick);
+  if (sumAbsentEl) sumAbsentEl.textContent = fmt(countAbsent);
 }
 
 // Generate report: check CSV, parse month/year, match name row, show working days
@@ -232,6 +304,7 @@ function getWorkingDays(yearAD, month) {
 
     const workingDays = getWorkingDays(year, month);
     const dataRow = rows[matchedRowIndex - 1];
+    const studentId = (document.getElementById("numberId") && document.getElementById("numberId").value) || "";
 
     // Day columns: header cells "1".."31"
     const dayCols = [];
@@ -265,6 +338,12 @@ function getWorkingDays(yearAD, month) {
       }
       html += `</ul>`;
     }
+    html += `<p class="mt-3 text-blue-600 font-medium">ข้อมูลถูกเติมในใบลงเวลาแล้ว เลื่อนลงด้านล่างหรือกดปุ่มพิมพ์เพื่อพิมพ์</p>`;
+
+    fillPrintForm(month, year, searchFullName, studentId, leaveByDay, workingDays);
+    const printform = document.getElementById("printform");
+    if (printform) printform.classList.remove("hidden");
+
     showResult(html, false);
   });
 })();
