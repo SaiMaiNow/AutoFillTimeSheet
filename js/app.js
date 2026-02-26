@@ -192,7 +192,11 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
     let timeIn = "";
     let timeOut = "";
     if (useRandomTime) {
-      if (code === "PL0.5M" || code === "SL0.5M") {
+      // Full-day leave (ลากิจทั้งวัน, ลาป่วยทั้งวัน) or absent: do not fill time in/out
+      if (code === "PL1" || code === "SL1" || code === "ขาด") {
+        timeIn = "";
+        timeOut = "";
+      } else if (code === "PL0.5M" || code === "SL0.5M") {
         timeIn = "12:00";
         timeOut = "18:00";
       } else if (code === "PL0.5A" || code === "SL0.5A") {
@@ -202,7 +206,6 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
         timeIn = randomTimeIn();
         timeOut = "18:00";
       }
-      // PL1, SL1, ขาด: leave timeIn/timeOut blank
     }
     if (code) {
       remark = LEAVE_CODE_TO_LABEL[code] || code;
