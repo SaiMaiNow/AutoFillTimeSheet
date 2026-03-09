@@ -355,6 +355,18 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
 
     const useRandomTime = document.getElementById("randomTimeCheck") && document.getElementById("randomTimeCheck").checked;
     fillPrintForm(month, year, searchFullName, studentId, leaveByDay, workingDays, useRandomTime);
+
+    // Save to localStorage after successful generate (no errors)
+    try {
+      const saved = {
+        firstName: firstName,
+        lastName: lastName,
+        numberId: studentId,
+        randomTimeCheck: !!useRandomTime,
+      };
+      localStorage.setItem("autofill-timesheet", JSON.stringify(saved));
+    } catch (e) { /* ignore */ }
+
     const printform = document.getElementById("printform");
     const reportResult = document.getElementById("reportResult");
     if (reportResult) {
@@ -366,6 +378,50 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       document.title = searchFullName;
       window.print();
       setTimeout(function () { document.title = prevTitle; }, 1000);
+    }
+  });
+})();
+
+// Load saved data from localStorage into form inputs
+(function () {
+  const STORAGE_KEY = "autofill-timesheet";
+  const loadBtn = document.getElementById("loadSavedData");
+  const reportResult = document.getElementById("reportResult");
+  const firstNameInput = document.getElementById("firstName");
+  const lastNameInput = document.getElementById("lastName");
+  const numberIdInput = document.getElementById("numberId");
+  const randomTimeCheck = document.getElementById("randomTimeCheck");
+
+  if (!loadBtn) return;
+
+  loadBtn.addEventListener("click", function () {
+    let data;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        if (reportResult) {
+          reportResult.innerHTML = "ไม่พบข้อมูลที่จำไว้";
+          reportResult.classList.remove("hidden");
+          reportResult.classList.add("bg-red-50", "text-red-700");
+        }
+        return;
+      }
+      data = JSON.parse(raw);
+    } catch (e) {
+      if (reportResult) {
+        reportResult.innerHTML = "ไม่พบข้อมูลที่จำไว้";
+        reportResult.classList.remove("hidden");
+        reportResult.classList.add("bg-red-50", "text-red-700");
+      }
+      return;
+    }
+    if (firstNameInput && data.firstName != null) firstNameInput.value = data.firstName;
+    if (lastNameInput && data.lastName != null) lastNameInput.value = data.lastName;
+    if (numberIdInput && data.numberId != null) numberIdInput.value = data.numberId;
+    if (randomTimeCheck) randomTimeCheck.checked = !!data.randomTimeCheck;
+    if (reportResult) {
+      reportResult.classList.add("hidden");
+      reportResult.innerHTML = "";
     }
   });
 })();
