@@ -97,10 +97,11 @@
         aria-hidden="true">
         <div class="absolute inset-0 bg-black/50" id="manualTimeModalBackdrop" role="presentation"></div>
         <div
-            class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-gray-200">
+            class="relative bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col border border-gray-200">
             <div class="px-4 py-3 border-b border-gray-200 shrink-0">
                 <h2 class="text-lg font-semibold text-gray-800">กรอกเวลาเข้า-ออก และหมายเหตุ</h2>
                 <p class="text-sm text-gray-500 mt-1">กำหนดรายวันตามวันทำงานในเดือน (จาก CSV)</p>
+                <p id="manualTimeModalError" class="mt-2 text-sm text-red-600 hidden" role="alert"></p>
             </div>
             <div id="manualTimeModalBody" class="overflow-y-auto flex-1 p-4 min-h-0"></div>
             <div class="flex gap-2 justify-end px-4 py-3 border-t border-gray-200 bg-gray-50 rounded-b-lg shrink-0">

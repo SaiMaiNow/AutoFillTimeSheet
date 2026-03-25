@@ -162,15 +162,62 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+const MANUAL_STATUS_FROM_CSV = new Set([
+  "PL0.5M", "PL0.5A", "PL1", "SL0.5M", "SL0.5A", "SL1", "ขาด",
+]);
+
+function csvCodeToManualStatus(csvCode) {
+  if (!csvCode) return "PRESENT";
+  return MANUAL_STATUS_FROM_CSV.has(csvCode) ? csvCode : "PRESENT";
+}
+
+const MANUAL_STATUS_SELECT_HTML =
+  '<select class="manual-status w-full min-w-[11rem] max-w-full px-2 py-1 border border-gray-200 rounded text-sm bg-white">' +
+  '<option value="PRESENT">มา</option>' +
+  '<option value="PL0.5M">ลากิจ — ครึ่งวันเช้า</option>' +
+  '<option value="PL0.5A">ลากิจ — ครึ่งวันบ่าย</option>' +
+  '<option value="PL1">ลากิจ — ทั้งวัน</option>' +
+  '<option value="SL0.5M">ลาป่วย — ครึ่งวันเช้า</option>' +
+  '<option value="SL0.5A">ลาป่วย — ครึ่งวันบ่าย</option>' +
+  '<option value="SL1">ลาป่วย — ทั้งวัน</option>' +
+  '<option value="ขาด">ขาด</option>' +
+  "</select>";
+
+function syncManualRowTimeInputsForAbsent(tr) {
+  const status = tr.querySelector(".manual-status") && tr.querySelector(".manual-status").value;
+  const tin = tr.querySelector(".manual-time-in");
+  const tout = tr.querySelector(".manual-time-out");
+  if (!tin || !tout) return;
+  if (status === "ขาด") {
+    tin.disabled = true;
+    tout.disabled = true;
+    tin.value = "";
+    tout.value = "";
+    tin.classList.add("opacity-50", "cursor-not-allowed");
+    tout.classList.add("opacity-50", "cursor-not-allowed");
+  } else {
+    tin.disabled = false;
+    tout.disabled = false;
+    tin.classList.remove("opacity-50", "cursor-not-allowed");
+    tout.classList.remove("opacity-50", "cursor-not-allowed");
+  }
+}
+
 function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, onCancel) {
   const modal = document.getElementById("manualTimeModal");
   const body = document.getElementById("manualTimeModalBody");
   const backdrop = document.getElementById("manualTimeModalBackdrop");
   const confirmBtn = document.getElementById("manualTimeModalConfirm");
   const cancelBtn = document.getElementById("manualTimeModalCancel");
+  const errEl = document.getElementById("manualTimeModalError");
   if (!modal || !body || !confirmBtn || !cancelBtn) {
     if (onCancel) onCancel();
     return;
+  }
+
+  if (errEl) {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
   }
 
   const leaveMap = {};
@@ -182,25 +229,31 @@ function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, 
     '<table class="w-full text-sm border-collapse">' +
     '<thead class="sticky top-0 bg-gray-100 z-10">' +
     "<tr>" +
-    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700">วัน/เดือน/ปี</th>' +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 whitespace-nowrap">วัน/เดือน/ปี</th>' +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 min-w-[12rem]">สถานะ</th>' +
     '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 w-[7.5rem]">เวลาเข้า</th>' +
     '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 w-[7.5rem]">เวลาออก</th>' +
-    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 min-w-[10rem]">หมายเหตุ</th>' +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 min-w-[9rem]">หมายเหตุ</th>' +
     "</tr></thead><tbody>";
 
   sorted.forEach(function (day) {
     const dateStr = day + "/" + month + "/" + yearBE;
     tableHtml +=
       '<tr data-manual-day="' + day + '" class="align-middle">' +
-      '<td class="border border-gray-300 px-2 py-2 text-gray-800 whitespace-nowrap">' + escapeHtml(dateStr) + "</td>" +
-      '<td class="border border-gray-300 px-2 py-1">' +
-      '<input type="time" class="manual-time-in w-full min-w-0 px-1 py-1 border border-gray-200 rounded text-sm">' +
+      '<td class="manual-date-label border border-gray-300 px-2 py-2 text-gray-800 whitespace-nowrap">' +
+      escapeHtml(dateStr) +
       "</td>" +
       '<td class="border border-gray-300 px-2 py-1">' +
-      '<input type="time" class="manual-time-out w-full min-w-0 px-1 py-1 border border-gray-200 rounded text-sm">' +
+      MANUAL_STATUS_SELECT_HTML +
       "</td>" +
       '<td class="border border-gray-300 px-2 py-1">' +
-      '<input type="text" class="manual-remark w-full min-w-0 px-2 py-1 border border-gray-200 rounded text-sm" placeholder="หมายเหตุ">' +
+      '<input type="time" step="any" class="manual-time-in w-full min-w-0 px-1 py-1 border border-gray-200 rounded text-sm">' +
+      "</td>" +
+      '<td class="border border-gray-300 px-2 py-1">' +
+      '<input type="time" step="any" class="manual-time-out w-full min-w-0 px-1 py-1 border border-gray-200 rounded text-sm">' +
+      "</td>" +
+      '<td class="border border-gray-300 px-2 py-1">' +
+      '<input type="text" class="manual-remark w-full min-w-0 px-2 py-1 border border-gray-200 rounded text-sm" placeholder="หมายเหตุ / เหตุผล">' +
       "</td></tr>";
   });
   tableHtml += "</tbody></table>";
@@ -209,11 +262,19 @@ function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, 
   sorted.forEach(function (day) {
     const tr = body.querySelector('tr[data-manual-day="' + day + '"]');
     if (!tr) return;
-    const code = leaveMap[day];
+    const csvCode = leaveMap[day];
+    const sel = tr.querySelector(".manual-status");
     const remarkInput = tr.querySelector(".manual-remark");
-    if (remarkInput && code) {
-      remarkInput.value = LEAVE_CODE_TO_LABEL[code] || code;
+    if (sel) sel.value = csvCodeToManualStatus(csvCode);
+    if (remarkInput && csvCode) {
+      remarkInput.value = LEAVE_CODE_TO_LABEL[csvCode] || csvCode;
     }
+    if (sel) {
+      sel.addEventListener("change", function () {
+        syncManualRowTimeInputsForAbsent(tr);
+      });
+    }
+    syncManualRowTimeInputsForAbsent(tr);
   });
 
   function closeModal() {
@@ -225,13 +286,22 @@ function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, 
   function collectOverrides() {
     const overrides = {};
     body.querySelectorAll("tr[data-manual-day]").forEach(function (tr) {
-      const day = parseInt(tr.getAttribute("data-manual-day"), 10);
+      const day = Number.parseInt(tr.getAttribute("data-manual-day"), 10);
+      const statusEl = tr.querySelector(".manual-status");
       const timeInEl = tr.querySelector(".manual-time-in");
       const timeOutEl = tr.querySelector(".manual-time-out");
       const remarkEl = tr.querySelector(".manual-remark");
+      const st = statusEl ? statusEl.value : "PRESENT";
+      let tin = timeInEl ? timeInEl.value : "";
+      let tout = timeOutEl ? timeOutEl.value : "";
+      if (st === "ขาด") {
+        tin = "";
+        tout = "";
+      }
       overrides[day] = {
-        timeIn: timeInEl ? timeInEl.value : "",
-        timeOut: timeOutEl ? timeOutEl.value : "",
+        status: st,
+        timeIn: tin,
+        timeOut: tout,
         remark: remarkEl ? remarkEl.value : "",
       };
     });
@@ -239,10 +309,15 @@ function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, 
   }
 
   confirmBtn.onclick = function () {
+    if (errEl) {
+      errEl.textContent = "";
+      errEl.classList.add("hidden");
+    }
     closeModal();
     onConfirm(collectOverrides());
   };
   cancelBtn.onclick = function () {
+    if (errEl) errEl.classList.add("hidden");
     closeModal();
     if (onCancel) onCancel();
   };
@@ -255,7 +330,7 @@ function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, 
   document.body.style.overflow = "hidden";
 }
 
-// manualOverrides: { [day: number]: { timeIn, timeOut, remark } } — used when timeMode === "manual"
+// manualOverrides: { [day: number]: { status, timeIn, timeOut, remark } } — used when timeMode === "manual"
 // timeMode: "random" | "manual" | "hand"
 function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays, timeMode, manualOverrides) {
   fullName = String(fullName || "").trim();
@@ -306,25 +381,58 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
         timeIn = randomTimeIn();
         timeOut = "18:00";
       }
+      if (code) {
+        remark = LEAVE_CODE_TO_LABEL[code] || code;
+        if (code === "ขาด") countAbsent += 1;
+        else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
+        else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+      } else {
+        countPresent += 1;
+      }
     } else if (timeMode === "manual" && manualOverrides) {
       const ov = manualOverrides[day] || {};
-      timeIn = escapeHtml(String(ov.timeIn || "").trim());
-      timeOut = escapeHtml(String(ov.timeOut || "").trim());
+      const status = ov.status || "PRESENT";
+      const leaveCode = status === "PRESENT" ? null : status;
+
+      if (leaveCode === "ขาด") {
+        timeIn = "";
+        timeOut = "";
+      } else {
+        timeIn = escapeHtml(String(ov.timeIn || "").trim());
+        timeOut = escapeHtml(String(ov.timeOut || "").trim());
+      }
+
       const userRemark = String(ov.remark || "").trim();
       remark = userRemark
         ? escapeHtml(userRemark)
-        : (code ? escapeHtml(LEAVE_CODE_TO_LABEL[code] || code) : "");
-    }
-    // hand: empty time; remark from leave below
-    if (code) {
-      if (timeMode !== "manual" || !manualOverrides) {
-        remark = LEAVE_CODE_TO_LABEL[code] || code;
+        : (leaveCode ? escapeHtml(LEAVE_CODE_TO_LABEL[leaveCode] || leaveCode) : "");
+
+      if (leaveCode === "ขาด") countAbsent += 1;
+      else if (leaveCode && /^PL/.test(leaveCode)) {
+        countPersonal += leaveCode === "PL1" ? 1 : 0.5;
+      } else if (leaveCode && /^SL/.test(leaveCode)) {
+        countSick += leaveCode === "SL1" ? 1 : 0.5;
+      } else {
+        countPresent += 1;
       }
-      if (code === "ขาด") countAbsent += 1;
-      else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
-      else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+    } else if (timeMode === "hand") {
+      if (code) {
+        remark = LEAVE_CODE_TO_LABEL[code] || code;
+        if (code === "ขาด") countAbsent += 1;
+        else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
+        else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+      } else {
+        countPresent += 1;
+      }
     } else {
-      countPresent += 1;
+      if (code) {
+        remark = LEAVE_CODE_TO_LABEL[code] || code;
+        if (code === "ขาด") countAbsent += 1;
+        else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
+        else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+      } else {
+        countPresent += 1;
+      }
     }
     rows.push(
       "<tr><td class=\"border border-black py-1 px-1\">" + dateStr +
