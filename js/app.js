@@ -156,8 +156,108 @@ function randomTimeIn() {
   return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
 }
 
-// Fill print form (#printform) with report data (inputs normalized for PDF)
-function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays, useRandomTime) {
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
+
+function openManualTimeModal(month, yearAD, workingDays, leaveByDay, onConfirm, onCancel) {
+  const modal = document.getElementById("manualTimeModal");
+  const body = document.getElementById("manualTimeModalBody");
+  const backdrop = document.getElementById("manualTimeModalBackdrop");
+  const confirmBtn = document.getElementById("manualTimeModalConfirm");
+  const cancelBtn = document.getElementById("manualTimeModalCancel");
+  if (!modal || !body || !confirmBtn || !cancelBtn) {
+    if (onCancel) onCancel();
+    return;
+  }
+
+  const leaveMap = {};
+  leaveByDay.forEach(({ day, code }) => { leaveMap[day] = code; });
+  const yearBE = yearAD + 543;
+  const sorted = [...workingDays].sort((a, b) => a - b);
+
+  let tableHtml =
+    '<table class="w-full text-sm border-collapse">' +
+    '<thead class="sticky top-0 bg-gray-100 z-10">' +
+    "<tr>" +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700">วัน/เดือน/ปี</th>' +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 w-[7.5rem]">เวลาเข้า</th>' +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 w-[7.5rem]">เวลาออก</th>' +
+    '<th class="border border-gray-300 px-2 py-2 text-left font-medium text-gray-700 min-w-[10rem]">หมายเหตุ</th>' +
+    "</tr></thead><tbody>";
+
+  sorted.forEach(function (day) {
+    const dateStr = day + "/" + month + "/" + yearBE;
+    tableHtml +=
+      '<tr data-manual-day="' + day + '" class="align-middle">' +
+      '<td class="border border-gray-300 px-2 py-2 text-gray-800 whitespace-nowrap">' + escapeHtml(dateStr) + "</td>" +
+      '<td class="border border-gray-300 px-2 py-1">' +
+      '<input type="time" class="manual-time-in w-full min-w-0 px-1 py-1 border border-gray-200 rounded text-sm">' +
+      "</td>" +
+      '<td class="border border-gray-300 px-2 py-1">' +
+      '<input type="time" class="manual-time-out w-full min-w-0 px-1 py-1 border border-gray-200 rounded text-sm">' +
+      "</td>" +
+      '<td class="border border-gray-300 px-2 py-1">' +
+      '<input type="text" class="manual-remark w-full min-w-0 px-2 py-1 border border-gray-200 rounded text-sm" placeholder="หมายเหตุ">' +
+      "</td></tr>";
+  });
+  tableHtml += "</tbody></table>";
+  body.innerHTML = tableHtml;
+
+  sorted.forEach(function (day) {
+    const tr = body.querySelector('tr[data-manual-day="' + day + '"]');
+    if (!tr) return;
+    const code = leaveMap[day];
+    const remarkInput = tr.querySelector(".manual-remark");
+    if (remarkInput && code) {
+      remarkInput.value = LEAVE_CODE_TO_LABEL[code] || code;
+    }
+  });
+
+  function closeModal() {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+    document.body.style.overflow = "";
+  }
+
+  function collectOverrides() {
+    const overrides = {};
+    body.querySelectorAll("tr[data-manual-day]").forEach(function (tr) {
+      const day = parseInt(tr.getAttribute("data-manual-day"), 10);
+      const timeInEl = tr.querySelector(".manual-time-in");
+      const timeOutEl = tr.querySelector(".manual-time-out");
+      const remarkEl = tr.querySelector(".manual-remark");
+      overrides[day] = {
+        timeIn: timeInEl ? timeInEl.value : "",
+        timeOut: timeOutEl ? timeOutEl.value : "",
+        remark: remarkEl ? remarkEl.value : "",
+      };
+    });
+    return overrides;
+  }
+
+  confirmBtn.onclick = function () {
+    closeModal();
+    onConfirm(collectOverrides());
+  };
+  cancelBtn.onclick = function () {
+    closeModal();
+    if (onCancel) onCancel();
+  };
+  if (backdrop) {
+    backdrop.onclick = cancelBtn.onclick;
+  }
+
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+  document.body.style.overflow = "hidden";
+}
+
+// manualOverrides: { [day: number]: { timeIn, timeOut, remark } } — used when timeMode === "manual"
+// timeMode: "random" | "manual" | "hand"
+function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDays, timeMode, manualOverrides) {
   fullName = String(fullName || "").trim();
   studentId = String(studentId || "").trim();
   const yearBE = yearAD + 543;
@@ -191,7 +291,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
     let remark = "";
     let timeIn = "";
     let timeOut = "";
-    if (useRandomTime) {
+    if (timeMode === "random") {
       // Full-day leave (ลากิจทั้งวัน, ลาป่วยทั้งวัน) or absent: do not fill time in/out
       if (code === "PL1" || code === "SL1" || code === "ขาด") {
         timeIn = "";
@@ -206,9 +306,20 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
         timeIn = randomTimeIn();
         timeOut = "18:00";
       }
+    } else if (timeMode === "manual" && manualOverrides) {
+      const ov = manualOverrides[day] || {};
+      timeIn = escapeHtml(String(ov.timeIn || "").trim());
+      timeOut = escapeHtml(String(ov.timeOut || "").trim());
+      const userRemark = String(ov.remark || "").trim();
+      remark = userRemark
+        ? escapeHtml(userRemark)
+        : (code ? escapeHtml(LEAVE_CODE_TO_LABEL[code] || code) : "");
     }
+    // hand: empty time; remark from leave below
     if (code) {
-      remark = LEAVE_CODE_TO_LABEL[code] || code;
+      if (timeMode !== "manual" || !manualOverrides) {
+        remark = LEAVE_CODE_TO_LABEL[code] || code;
+      }
       if (code === "ขาด") countAbsent += 1;
       else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
       else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
@@ -353,32 +464,85 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
       leaveByDay.push({ day, raw, code });
     }
 
-    const useRandomTime = document.getElementById("randomTimeCheck") && document.getElementById("randomTimeCheck").checked;
-    fillPrintForm(month, year, searchFullName, studentId, leaveByDay, workingDays, useRandomTime);
-
-    // Save to localStorage after successful generate (no errors)
-    try {
-      const saved = {
-        firstName: firstName,
-        lastName: lastName,
-        numberId: studentId,
-        randomTimeCheck: !!useRandomTime,
-      };
-      localStorage.setItem("autofill-timesheet", JSON.stringify(saved));
-    } catch (e) { /* ignore */ }
-
-    const printform = document.getElementById("printform");
-    const reportResult = document.getElementById("reportResult");
-    if (reportResult) {
-      reportResult.classList.add("hidden");
-      reportResult.innerHTML = "";
+    function getTimeMode() {
+      if (document.getElementById("randomTimeCheck")?.checked) return "random";
+      if (document.getElementById("manualTimeCheck")?.checked) return "manual";
+      if (document.getElementById("handTimeCheck")?.checked) return "hand";
+      return "hand";
     }
-    if (printform) {
-      const prevTitle = document.title;
-      document.title = searchFullName;
-      window.print();
-      setTimeout(function () { document.title = prevTitle; }, 1000);
+    const timeMode = getTimeMode();
+
+    function finishReport(manualOverrides) {
+      fillPrintForm(
+        month,
+        year,
+        searchFullName,
+        studentId,
+        leaveByDay,
+        workingDays,
+        timeMode,
+        manualOverrides || null
+      );
+
+      try {
+        const saved = {
+          firstName: firstName,
+          lastName: lastName,
+          numberId: studentId,
+          timeMode: timeMode,
+          randomTimeCheck: timeMode === "random",
+        };
+        localStorage.setItem("autofill-timesheet", JSON.stringify(saved));
+      } catch (e) { /* ignore */ }
+
+      const printform = document.getElementById("printform");
+      const reportResult = document.getElementById("reportResult");
+      if (reportResult) {
+        reportResult.classList.add("hidden");
+        reportResult.innerHTML = "";
+      }
+      if (printform) {
+        const prevTitle = document.title;
+        document.title = searchFullName;
+        window.print();
+        setTimeout(function () { document.title = prevTitle; }, 1000);
+      }
     }
+
+    if (timeMode === "manual") {
+      openManualTimeModal(
+        month,
+        year,
+        workingDays,
+        leaveByDay,
+        function (overrides) {
+          finishReport(overrides);
+        },
+        function () {
+          showResult("ยกเลิกการพิมพ์", false);
+        }
+      );
+      return;
+    }
+
+    finishReport(null);
+  });
+})();
+
+// Only one time-entry mode checkbox at a time
+(function () {
+  const randomEl = document.getElementById("randomTimeCheck");
+  const manualEl = document.getElementById("manualTimeCheck");
+  const handEl = document.getElementById("handTimeCheck");
+  const group = [randomEl, manualEl, handEl].filter(Boolean);
+  if (group.length === 0) return;
+  group.forEach(function (el) {
+    el.addEventListener("change", function () {
+      if (!el.checked) return;
+      group.forEach(function (other) {
+        if (other !== el) other.checked = false;
+      });
+    });
   });
 })();
 
@@ -391,6 +555,14 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
   const lastNameInput = document.getElementById("lastName");
   const numberIdInput = document.getElementById("numberId");
   const randomTimeCheck = document.getElementById("randomTimeCheck");
+  const manualTimeCheck = document.getElementById("manualTimeCheck");
+  const handTimeCheck = document.getElementById("handTimeCheck");
+
+  function applyTimeMode(mode) {
+    if (randomTimeCheck) randomTimeCheck.checked = mode === "random";
+    if (manualTimeCheck) manualTimeCheck.checked = mode === "manual";
+    if (handTimeCheck) handTimeCheck.checked = mode === "hand";
+  }
 
   if (!loadBtn) return;
 
@@ -418,7 +590,13 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
     if (firstNameInput && data.firstName != null) firstNameInput.value = data.firstName;
     if (lastNameInput && data.lastName != null) lastNameInput.value = data.lastName;
     if (numberIdInput && data.numberId != null) numberIdInput.value = data.numberId;
-    if (randomTimeCheck) randomTimeCheck.checked = !!data.randomTimeCheck;
+    if (data.timeMode === "random" || data.timeMode === "manual" || data.timeMode === "hand") {
+      applyTimeMode(data.timeMode);
+    } else if (data.randomTimeCheck) {
+      applyTimeMode("random");
+    } else {
+      applyTimeMode("hand");
+    }
     if (reportResult) {
       reportResult.classList.add("hidden");
       reportResult.innerHTML = "";
