@@ -73,6 +73,9 @@ const LEAVE_CODE_TO_LABEL = {
   "SL1": "ลาป่วยทั้งวัน",
   "SL0.5M": "ลาป่วยครึ่งวันเช้า",
   "SL0.5A": "ลาป่วยครึ่งวันบ่าย",
+  "WFH": "work from home ทั้งวัน",
+  "WFH-M": "work from home เช้า",
+  "WFH-A": "work from home บ่าย",
   "ขาด": "ขาด",
 };
 
@@ -121,6 +124,9 @@ const LEAVE_CODE_RULES = [
   { pattern: /ลากิจ\s*ทั้งวัน|PL\s*1|PL1/i, code: "PL1" },
   { pattern: /ลากิจ\s*ครึ่งวันเช้า|PL\s*0\.5\s*M|PL0\.5M/i, code: "PL0.5M" },
   { pattern: /ลากิจ\s*ครึ่งวันบ่าย|PL\s*0\.5\s*A|PL0\.5A/i, code: "PL0.5A" },
+  { pattern: /work\s*from\s*home\s*เช้า|WFH\s*[-]?\s*M|WFH-M/i, code: "WFH-M" },
+  { pattern: /work\s*from\s*home\s*บ่าย|WFH\s*[-]?\s*A|WFH-A/i, code: "WFH-A" },
+  { pattern: /work\s*from\s*home\s*ทั้งวัน|WFH(?!\s*[-]?\s*[MA])/i, code: "WFH" },
   { pattern: /ขาด/i, code: "ขาด" },
 ];
 
@@ -163,7 +169,7 @@ function escapeHtml(text) {
 }
 
 const MANUAL_STATUS_FROM_CSV = new Set([
-  "PL0.5M", "PL0.5A", "PL1", "SL0.5M", "SL0.5A", "SL1", "ขาด",
+  "PL0.5M", "PL0.5A", "PL1", "SL0.5M", "SL0.5A", "SL1", "WFH-M", "WFH-A", "WFH", "ขาด",
 ]);
 
 function csvCodeToManualStatus(csvCode) {
@@ -180,6 +186,9 @@ const MANUAL_STATUS_SELECT_HTML =
   '<option value="SL0.5M">ลาป่วย — ครึ่งวันเช้า</option>' +
   '<option value="SL0.5A">ลาป่วย — ครึ่งวันบ่าย</option>' +
   '<option value="SL1">ลาป่วย — ทั้งวัน</option>' +
+  '<option value="WFH-M">WFH-M — work from home เช้า</option>' +
+  '<option value="WFH-A">WFH-A — work from home บ่าย</option>' +
+  '<option value="WFH">WFH — work from home ทั้งวัน</option>' +
   '<option value="ขาด">ขาด</option>' +
   "</select>";
 
@@ -386,6 +395,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
         if (code === "ขาด") countAbsent += 1;
         else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
         else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+        else countPresent += 1;
       } else {
         countPresent += 1;
       }
@@ -421,6 +431,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
         if (code === "ขาด") countAbsent += 1;
         else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
         else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+        else countPresent += 1;
       } else {
         countPresent += 1;
       }
@@ -430,6 +441,7 @@ function fillPrintForm(month, yearAD, fullName, studentId, leaveByDay, workingDa
         if (code === "ขาด") countAbsent += 1;
         else if (/^PL/.test(code)) countPersonal += code === "PL1" ? 1 : 0.5;
         else if (/^SL/.test(code)) countSick += code === "SL1" ? 1 : 0.5;
+        else countPresent += 1;
       } else {
         countPresent += 1;
       }
